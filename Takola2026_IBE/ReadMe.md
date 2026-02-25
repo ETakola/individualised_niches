@@ -6,7 +6,7 @@ This is a conceptual figure of the main idea behind the study.
 
 Figure: Heuristic representation of the different niche levels. A) A community can be represented as a set of species where each one occupies a different niche. B) A species can be represented as a set of meta-populations with different niches. C) A population consists of multiple individuals with different individualised niches (potential niche is shown with transparent dots, realized niche is shown with bold dots). 
 ## What is the individualised niche?
-In 2022, Takola & Schielzeth published a study introducing the concept of individualised niche.
+In 2022, Takola & Schielzeth published [a study]([url](https://www.researchgate.net/publication/361497997_Hutchinson's_ecological_niche_for_individuals)) introducing the concept of individualised niche.
 They defined it as the range of environmental conditions under which a particular individual has an expected lifetime reproductive success of ≥ 1 surviving offspring. 
 Similarly to the Hutchinsonian ecological niche, they distinguished between the realized and the potential individualised niche. 
 
