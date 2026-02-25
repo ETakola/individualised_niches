@@ -13,7 +13,7 @@ Similarly to the Hutchinsonian ecological niche, they distinguished between the 
 * The realized individualized niche is the place in environmental space in which a particular individual is found and has an expected lifetime reproductive success of ≥ 1. The realized individualized niche can be quantified empirically.
 * The potential individualized niche is the volume in environmental space in which a particular individual could be found with an expected lifetime reproductive success of ≥ 1. The potential individualized niche cannot directly be quantified, but significant parts of the niche space can usually be statistically inferred.
 
-They also defined a fundamental individualised niche, but this is not relevant to this study (a definition is provided here: [https://www.researchgate.net/publication/361497997_Hutchinson's_ecological_niche_for_individuals](url) ). 
+They also defined a fundamental individualised niche, but this is not relevant to this study (a definition is provided [here](https://www.researchgate.net/publication/361497997_Hutchinson's_ecological_niche_for_individuals)). 
 
 ## Repository folders
 There are three folders in this repository: _Data_, _Results_ and _Script_. 
