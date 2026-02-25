@@ -8,8 +8,10 @@ Figure: Heuristic representation of the different niche levels. A) A community c
 In 2022, Takola & Schielzeth published a study introducing the concept of individualised niche.
 They defined it as the range of environmental conditions under which a particular individual has an expected lifetime reproductive success of ≥ 1 surviving offspring. 
 Similarly to the Hutchinsonian ecological niche, they distinguished between the realized and the potential individualised niche. 
-The realized individualized niche is the place in environmental space in which a particular individual is found and has an expected lifetime reproductive success of ≥ 1. The realized individualized niche can be quantified empirically.
-The potential individualized niche is the volume in environmental space in which a particular individual could be found with an expected lifetime reproductive success of ≥ 1. The potential individualized niche cannot directly be quantified, but significant parts of the niche space can usually be statistically inferred.
+
+* The realized individualized niche is the place in environmental space in which a particular individual is found and has an expected lifetime reproductive success of ≥ 1. The realized individualized niche can be quantified empirically.
+* The potential individualized niche is the volume in environmental space in which a particular individual could be found with an expected lifetime reproductive success of ≥ 1. The potential individualized niche cannot directly be quantified, but significant parts of the niche space can usually be statistically inferred.
+
 They also defined a fundamental individualised niche, but this is not relevant to this study (a definition is provided here: [https://www.researchgate.net/publication/361497997_Hutchinson's_ecological_niche_for_individuals](url) ). 
 
 ## Repository folders
