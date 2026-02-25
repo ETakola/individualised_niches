@@ -2,8 +2,8 @@ All the details about the compilation of the dataset can be found here: [https:/
 
 |     Column name        |                 Description                    |
 |------------------------|------------------------------------------------|
-|burst_	|
-|x1_	|
+|burst_	| A group of steps
+|x1_	| The coordinate w
 |x2_	|
 |y1_	|
 |y2_	|
