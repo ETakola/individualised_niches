@@ -1,0 +1,1297 @@
+##################################################################################################
+# Title: The Individualised Niche in Motion; quantifying individualised niches with movement data
+# Author: Dr. Elina Takola
+# Date: 24.02.2026
+##################################################################################################
+#####################
+# Preparation
+####################
+#Load packages and data
+library(glmmTMB)
+library(dplyr)
+library(ggplot2)
+library(ggeffects)
+library(broom.mixed)
+library(lme4)
+library(performance)
+library(sf)
+library(rptR)
+library(purrr)
+library(stringr)
+library(marginaleffects)
+library(tidyr)
+library(ggplot2)
+library(ggforce)
+library(gridExtra)
+library(viridis)
+library(forcats)
+library(patchwork)
+library(gridExtra)
+library(grid)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(patchwork)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(patchwork)
+library(stringr)
+library(forcats)
+
+library(patchwork)
+
+
+ssf_dat_sfc10k <- readRDS("ssf_dat_sfc10kr.rds")
+ssf_dat_sfc10k_orig <- ssf_dat_sfc10k
+#ssf_dat_sfc10k <- ssf_dat_sfc10k_orig
+ssf_dat_sfc10k_no_geom <- sf::st_drop_geometry(ssf_dat_sfc10k)
+
+# Remove rare crop types
+ssf_dat_sfc10k <- ssf_dat_sfc10k_no_geom %>%
+  dplyr::filter(crop_type %in% names(table(crop_type))[table(crop_type) >= 31])
+
+#######################################
+# Create a heuristic diagram of the idea
+#######################################
+# Heuristic niche diagram (A, B, C) - FINAL
+# - pA: filled overlapping ellipses
+# - pB: transparent overlapping dots inside ellipses
+# - pC: transparent overlapping dots inside ellipses + filled focal dots (same colour)
+# - axis labels = 16
+# - plot titles = 20
+# - combined into one figure
+
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(patchwork)
+library(grid)
+
+set.seed(42)
+
+ellipse_points <- function(cx, cy, a, b, angle = 0, n = 360) {
+  t <- seq(0, 2*pi, length.out = n)
+  xr <- a * cos(t)
+  yr <- b * sin(t)
+  x  <- cx + xr * cos(angle) - yr * sin(angle)
+  y  <- cy + xr * sin(angle) + yr * cos(angle)
+  tibble(x = x, y = y)
+}
+
+# Sample points uniformly inside a rotated ellipse
+sample_points_in_ellipse <- function(n, cx, cy, a, b, angle = 0) {
+  theta <- runif(n, 0, 2*pi)
+  r <- sqrt(runif(n))
+  x0 <- a * r * cos(theta)
+  y0 <- b * r * sin(theta)
+  
+  x <- cx + x0 * cos(angle) - y0 * sin(angle)
+  y <- cy + x0 * sin(angle) + y0 * cos(angle)
+  
+  tibble(x = x, y = y)
+}
+
+niche_theme <- function() {
+  theme_void(base_size = 13) +
+    theme(
+      plot.background  = element_rect(fill = "white", colour = NA),
+      panel.background = element_rect(fill = "white", colour = NA),
+      panel.border     = element_rect(fill = NA, colour = "#D9DEE5", linewidth = 0.7),
+      plot.title       = element_text(face = "bold", size = 20, hjust = 0, margin = margin(b = 6)),
+      plot.margin      = margin(12, 12, 12, 12)
+    )
+}
+
+add_L_axes <- function(p,
+                       x0 = 1.1, y0 = 1.1, x1 = 9.35, y1 = 8.85,
+                       axis_col = "#2F2F2F") {
+  p +
+    annotate("segment", x = x0, xend = x0, y = y0, yend = y1,
+             linewidth = 0.9, colour = axis_col, lineend = "round") +
+    annotate("segment", x = x0, xend = x1, y = y0, yend = y0,
+             linewidth = 0.9, colour = axis_col, lineend = "round") +
+    annotate("text", x = x0 - 0.35, y = (y0 + y1) / 2, label = "Niche dimension 2",
+             angle = 90, size = 16 / .pt, colour = "#4A4A4A") +
+    annotate("text", x = (x0 + x1) / 2, y = y0 - 0.38, label = "Niche dimension 1",
+             size = 16 / .pt, colour = "#4A4A4A")
+}
+
+# A) Species niche (filled ellipses)
+
+A_specs <- tibble::tribble(
+  ~id, ~cx, ~cy, ~a,  ~b,  ~ang,  ~fill,      ~col,
+  "e1", 2.4, 4.0, 0.9, 2.0,  0.02, "#5B0E73", "#4A005E",
+  "e2", 4.5, 2.5, 2.2, 1.0,  0.00, "#5F3E8B", "#4B2F74",
+  "e3", 4.3, 7.9, 1.7, 0.9,  0.00, "#B8D933", "#9AC51A",
+  "e4", 4.4, 5.7, 1.3, 1.2,  0.00, "#49C487", "#28A96E",
+  "e5", 6.3, 6.3, 1.7, 2.4,  0.12, "#2B7C8A", "#146A78",
+  "e6", 7.3, 4.4, 1.5, 1.8,  0.25, "#2F6FA4", "#235E8D"
+)
+
+A_ell <- bind_rows(lapply(seq_len(nrow(A_specs)), function(i) {
+  s <- A_specs[i, ]
+  ellipse_points(s$cx, s$cy, s$a, s$b, s$ang) %>%
+    mutate(id = s$id, fill = s$fill, col = s$col)
+}))
+
+pA <- ggplot() +
+  geom_polygon(
+    data = A_ell,
+    aes(x, y, group = id, fill = fill, colour = col),
+    alpha = 0.78, linewidth = 1.0, linejoin = "round"
+  ) +
+  scale_fill_identity() +
+  scale_colour_identity() +
+  coord_fixed(xlim = c(0, 10), ylim = c(0, 10), expand = FALSE, clip = "off") +
+  labs(title = "A) Species niche") +
+  niche_theme()
+
+pA <- add_L_axes(pA)
+
+# B) Population niche (transparent overlapping dots)
+
+# Big outer ellipse (lowered)
+B_outer <- ellipse_points(cx = 5.35, cy = 4.95, a = 2.85, b = 3.55, angle = 0.33)
+
+# Inner ellipse specs (same colours as your chosen version)
+B_specs <- tibble::tribble(
+  ~id, ~cx,  ~cy,  ~a,   ~b,   ~ang,   ~fill,      ~col,       ~n_pts, ~alpha,
+  "B2", 4.95, 5.85, 2.05, 0.85,  0.30, "#7FCDAA", "#53B792",   320,    0.09,
+  "B3", 6.45, 5.55, 1.35, 0.75, -0.78, "#8FD6B6", "#59BD9A",   260,    0.09,
+  "B1", 4.15, 3.80, 1.20, 1.45,  0.18, "#2CA6B0", "#0E7F88",   340,    0.10
+)
+
+# Smooth outlines for inner ellipses
+B_ell_outline <- bind_rows(lapply(seq_len(nrow(B_specs)), function(i) {
+  s <- B_specs[i, ]
+  ellipse_points(s$cx, s$cy, s$a, s$b, s$ang) %>%
+    mutate(id = s$id, col = s$col)
+}))
+
+# Transparent overlapping dots inside each inner ellipse
+B_dots <- bind_rows(lapply(seq_len(nrow(B_specs)), function(i) {
+  s <- B_specs[i, ]
+  sample_points_in_ellipse(s$n_pts, s$cx, s$cy, s$a, s$b, s$ang) %>%
+    mutate(id = s$id, fill = s$fill, alpha = s$alpha)
+}))
+
+pB <- ggplot() +
+  geom_path(
+    data = B_outer, aes(x, y),
+    colour = "#207985", linewidth = 1.5, lineend = "round", linejoin = "round"
+  ) +
+  geom_point(
+    data = B_dots,
+    aes(x, y, colour = fill, alpha = alpha),
+    size = 2.8
+  ) +
+  geom_path(
+    data = B_ell_outline,
+    aes(x, y, group = id, colour = col),
+    linewidth = 0.85, lineend = "round", linejoin = "round"
+  ) +
+  scale_colour_identity() +
+  scale_alpha_identity() +
+  coord_fixed(xlim = c(0, 10), ylim = c(0, 10), expand = FALSE, clip = "off") +
+  labs(title = "B) Population niche") +
+  niche_theme()
+
+pB <- add_L_axes(pB)
+
+# C) Individualised niche (transparent overlapping dots + filled focal dots)
+
+C_outer <- ellipse_points(cx = 5.5, cy = 5.1, a = 2.4, b = 4.1, angle = 0.58)
+
+C_specs <- tibble::tribble(
+  ~id, ~cx, ~cy, ~a,  ~b,  ~ang,   ~fill,      ~col,       ~alpha, ~n_pts,
+  "c1", 3.8, 6.4, 0.9, 1.5, -0.10, "#73C8B3", "#42A890",   0.08,   220,
+  "c2", 5.9, 6.4, 1.0, 1.2,  0.25, "#9ADBCB", "#53B59D",   0.08,   220,
+  "c3", 6.8, 3.1, 1.1, 1.4, -0.35, "#5FBFA7", "#359E84",   0.08,   230,
+  "c4", 4.6, 4.1, 0.8, 0.9,  0.15, "#CDEFE7", "#78C9B8",   0.08,   180,
+  "c5", 4.0, 7.8, 1.0, 0.7, -0.10, "#AEE4D7", "#63BEA9",   0.08,   170
+)
+
+# Small ellipse outlines
+C_ell_outline <- bind_rows(lapply(seq_len(nrow(C_specs)), function(i) {
+  s <- C_specs[i, ]
+  ellipse_points(s$cx, s$cy, s$a, s$b, s$ang) %>%
+    mutate(id = s$id, col = s$col)
+}))
+
+# Transparent overlapping dots inside each small ellipse
+C_dots <- bind_rows(lapply(seq_len(nrow(C_specs)), function(i) {
+  s <- C_specs[i, ]
+  sample_points_in_ellipse(s$n_pts, s$cx, s$cy, s$a, s$b, s$ang) %>%
+    mutate(id = s$id, fill = s$fill, alpha = s$alpha)
+}))
+
+# Focal dots (all same colour)
+C_pts <- tibble(
+  x = c(3.9, 6.0, 7.1, 4.4, 4.5),
+  y = c(6.6, 7.2, 2.8, 4.5, 8.0)
+)
+
+pC <- ggplot() +
+  geom_path(
+    data = C_outer, aes(x, y),
+    colour = "#49AF98", linewidth = 1.5, lineend = "round", linejoin = "round"
+  ) +
+  geom_point(
+    data = C_dots,
+    aes(x, y, colour = fill, alpha = alpha),
+    size = 2.5
+  ) +
+  geom_path(
+    data = C_ell_outline,
+    aes(x, y, group = id, colour = col),
+    linewidth = 0.8, lineend = "round", linejoin = "round"
+  ) +
+  geom_point(
+    data = C_pts,
+    aes(x, y),
+    shape = 21, size = 3.2, stroke = 1.0,
+    fill = "#49AF98", colour = "#2E8F7A"
+  ) +
+  scale_colour_identity() +
+  scale_fill_identity() +
+  scale_alpha_identity() +
+  coord_fixed(xlim = c(0, 10), ylim = c(0, 10), expand = FALSE, clip = "off") +
+  labs(title = "C) Individualised niche") +
+  niche_theme()
+
+pC <- add_L_axes(pC)
+
+# Combine panels
+combined_plot <- (pA | pB | pC) +
+  plot_layout(ncol = 3) &
+  theme(
+    legend.position = "none",
+    plot.margin = margin(8, 8, 8, 8)
+  )
+
+combined_plot
+
+# Optional save:
+# ggsave("heuristic_niche_diagram_final.png", combined_plot,
+#        width = 15.5, height = 5.5, dpi = 320, bg = "white")
+#######################################
+# Food resources
+#######################################
+# Fit only random slopes, not random intercept to avoid collapses
+food <- glmmTMB(case_ ~ cos_ta_ + log_sl_ + etf_abundance_r * swi_T15 +
+    (1 | id) +
+    (0 + etf_abundance_r | id) +
+    (0 + swi_T15 | id) +
+    (0 + etf_abundance_r:swi_T15 | id),
+  data = ssf_dat_sfc10k, family = binomial())
+summary(food)
+
+# fixed effects table 
+food_fix <- broom.mixed::tidy(food, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "food") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+# random-effects conditional modes (BLUPs) by grouping factor
+etf_slopes <- broom.mixed::tidy(food, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "etf_abundance_r") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+swi_slopes <- broom.mixed::tidy(food, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "swi_T15") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+etf_swi_slopes <- broom.mixed::tidy(food, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "etf_abundance_r:swi_T15") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Weather
+#######################################
+# Correlation between temp_2m and t_precipitation is -0.008
+# Individuals do not differ in wind_speed
+weather <- glmmTMB(case_ ~ cos_ta_ + log_sl_ + 
+                         temp_2m + t_precipitation + wind_speed_10m +
+                     (1 | id) + (0 + temp_2m | id),
+                   data = ssf_dat_sfc10k, family = binomial(link = "logit"))
+summary(weather)
+
+# fixed effects table 
+weather_fix <- broom.mixed::tidy(weather, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "weather") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+# random-effects conditional modes (BLUPs) by grouping factor
+temp_slopes <- broom.mixed::tidy(weather, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "temp_2m") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Soil
+#######################################
+# AIC of model with random slopes is lower than model without
+soil <- glmmTMB(
+  case_ ~ cos_ta_ + log_sl_ + swi_T15 + nitrog + org_carbon +
+    (1 | id) +
+    (0 + swi_T15 | id) +
+    (0 + nitrog | id) +
+    (0 + org_carbon | id) +
+    (1 | id:step_id_),
+  data = ssf_dat_sfc10k,
+  family = binomial()
+)
+summary(soil)
+
+# fixed effects table 
+soil_fix <- broom.mixed::tidy(soil, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "soil") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+
+# random-effects conditional modes (BLUPs) by grouping factor
+soil_swi_slopes <- broom.mixed::tidy(soil, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "swi_T15") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+soil_nitrog_slopes <- broom.mixed::tidy(soil, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "nitrog") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+soil_orgC_slopes <- broom.mixed::tidy(soil, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "org_carbon") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Human activity
+#######################################
+# Don't fit random slopes for cropping intensity because it is a factor
+humans <- glmmTMB(
+  case_ ~ cos_ta_ + log_sl_ +
+    pop_dens + thp + crop_intens + p_glyphosate + p_propiconazole +
+    (1 | id) +
+    (0 + pop_dens | id) +
+    (0 + thp | id) +
+    (0 + p_glyphosate | id) +
+    (0 + p_propiconazole | id),
+  data = ssf_dat_sfc10k,
+  family = binomial(link = "logit"),
+  control = glmmTMBControl(optimizer = optim, optArgs = list(method = "BFGS"))
+)
+summary(humans)
+
+# fixed effects table 
+humans_fix <- broom.mixed::tidy(humans, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "humans") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+
+# random-effects conditional modes (BLUPs) by grouping factor
+humans_popdens_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "pop_dens") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+humans_thp_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "thp") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+humans_glyph_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_glyphosate") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+humans_prop_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_propiconazole") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Vegetation
+#######################################
+veg <- glmmTMB(
+       case_ ~ cos_ta_ + log_sl_ + NDVI + crop_type + p_glyphosate + p_propiconazole +
+             (1 | id) +
+             (0 + NDVI | id) +
+             (0 + p_glyphosate | id) +
+             (0 + p_propiconazole | id),
+       data = ssf_dat_sfc10k,
+       family = binomial(link = "logit"),
+       control = glmmTMBControl(optimizer = optim, optArgs = list(method = "BFGS")))
+summary(veg)
+
+# fixed effects table
+veg_fix <- broom.mixed::tidy(veg, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "veg") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+
+# random-effects conditional modes (BLUPs) by grouping factor
+veg_ndvi_slopes <- broom.mixed::tidy(veg, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "NDVI") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+veg_glyph_slopes <- broom.mixed::tidy(veg, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_glyphosate") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+veg_prop_slopes <- broom.mixed::tidy(veg, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_propiconazole") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#################################################
+# Plot model estimates for all model predictors
+#################################################
+fix_all <- bind_rows(food_fix, weather_fix, soil_fix, humans_fix, veg_fix) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    model = recode(model,
+                   food = "Food resources",
+                   weather = "Weather",
+                   soil = "Soil",
+                   humans = "Human activity",
+                   veg = "Vegetation"
+    ),
+    
+    # set facet order here
+    model = factor(model, levels = c(
+      "Human activity",
+      "Food resources",
+      "Weather",
+      "Vegetation",
+      "Soil")),
+    
+    term = recode(term,
+                  cos_ta_ = "cos(turn angle)",
+                  log_sl_ = "log(step length)",
+                  etf_abundance_r = "ETF abundance",
+                  swi_T15 = "Soil water index (T15)",
+                  `etf_abundance_r:swi_T15` = "ETF × SWI",
+                  temp_2m = "Temperature (2m)",
+                  t_precipitation = "Precipitation",
+                  wind_speed_10m = "Wind speed (10m)",
+                  nitrog = "Nitrogen",
+                  org_carbon = "Soil organic carbon",
+                  pop_dens = "Population density",
+                  thp = "THP",
+                  p_glyphosate = "Glyphosate",
+                  p_propiconazole = "Propiconazole",
+                  NDVI = "NDVI",
+                  crop_typeBarley = "Barley crops",
+                  crop_typeCommon_wheat = "Common wheat crops",
+                  crop_typeGrassland = "Grasslands",
+                  crop_typeMaize = "Maize crops",
+                  crop_typeOther_fod_crops = "Other fodder crops",
+                  crop_typePotatoes = "Potato crops",
+                  crop_typePuls_veg_flow = "Pulses/Vegetables/Flowers",
+                  crop_typeSugar_beet = "Sugar beet crops",
+                  crop_typeSunflower = "Sunflower crops",
+                  crop_typewater = "Water",
+                  crop_typeWood_shrubland = "Woody shrublands",
+                  `crop_intens multi_season` = "Multi-season cropping",
+                  `crop_intensDouble-season` = "Double-season cropping",
+                  `crop_intensSingle_season` = "Single-season cropping"
+    )
+  )
+write.csv(fix_all, file = "fixedeffects_glmmTMB.csv", row.names = FALSE)
+# mean–error (dot + whisker) plot
+ggplot(fix_all, aes(x = estimate, y = fct_rev(term))) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
+  geom_point(size = 2) +
+  facet_wrap(~ model, scales = "free_y") +
+  theme_bw() +
+  labs(x = "Estimate (95% CI)", y = NULL) +
+  theme(
+    strip.background = element_rect(fill = "#440154", color = "#440154"),
+    strip.text = element_text(color = "white")
+  )
+###################################
+# Now let's plot the random slopes
+###################################
+# fixed slope helper (from your *_fix tables)
+get_beta <- function(fix_tbl, term_name) {
+  fix_tbl %>% filter(term == term_name) %>% pull(estimate) %>% .[1]
+}
+
+# x-seq helper (from your data)
+make_xseq <- function(dat, var, n = 60) {
+  seq(min(dat[[var]], na.rm = TRUE),
+      max(dat[[var]], na.rm = TRUE),
+      length.out = n)
+}
+
+# build straight-line reaction norms for one slope object
+build_rn_lines <- function(slopes_tbl, fix_tbl, term_name, dat, xvec, model_label, term_label, link = c("identity","logit")) {
+  link <- match.arg(link)
+  beta <- get_beta(fix_tbl, term_name)
+  
+  slopes_tbl %>%
+    mutate(
+      model = model_label,
+      term  = term_label,
+      slope_total = beta + slope_blup
+    ) %>%
+    crossing(x = xvec) %>%
+    mutate(
+      eta = slope_total * x,                     # straight line on link/identity scale
+      y   = if (link == "logit") eta else eta    # keep as eta to guarantee straight lines
+    ) %>%
+    dplyr::select(model, term, id, x, y)
+}
+
+# create x grids
+x_etf       <- make_xseq(ssf_dat_sfc10k, "etf_abundance_r", 60)
+x_swi       <- make_xseq(ssf_dat_sfc10k, "swi_T15", 60)
+x_temp      <- make_xseq(ssf_dat_sfc10k, "temp_2m", 60)
+x_nitrog    <- make_xseq(ssf_dat_sfc10k, "nitrog", 60)
+x_orgC      <- make_xseq(ssf_dat_sfc10k, "org_carbon", 60)
+x_pop       <- make_xseq(ssf_dat_sfc10k, "pop_dens", 60)
+x_thp       <- make_xseq(ssf_dat_sfc10k, "thp", 60)
+x_glyph     <- make_xseq(ssf_dat_sfc10k, "p_glyphosate", 60)
+x_prop      <- make_xseq(ssf_dat_sfc10k, "p_propiconazole", 60)
+x_ndvi      <- make_xseq(ssf_dat_sfc10k, "NDVI", 60)
+
+# interaction slope: use product as x (straight line in the interaction term)
+x_etf_swi <- {
+  prod <- ssf_dat_sfc10k$etf_abundance_r * ssf_dat_sfc10k$swi_T15
+  seq(min(prod, na.rm = TRUE), max(prod, na.rm = TRUE), length.out = 60)
+}
+
+# Put the random slopes in one table per model
+rn_list <- list(
+ food = bind_rows(build_rn_lines(etf_slopes, food_fix, "etf_abundance_r", ssf_dat_sfc10k, x_etf,
+                   "Food resources", "ETF abundance", link = "logit"),
+    build_rn_lines(swi_slopes, food_fix, "swi_T15", ssf_dat_sfc10k, x_swi,
+                   "Food resources", "Soil water index (T15)", link = "logit"),
+    build_rn_lines(etf_swi_slopes, food_fix, "etf_abundance_r:swi_T15", ssf_dat_sfc10k, x_etf_swi,
+                   "Food resources", "ETF × SWI", link = "logit")),
+  weather = bind_rows(build_rn_lines(temp_slopes, weather_fix, "temp_2m", ssf_dat_sfc10k, x_temp,
+                   "Weather", "Temperature (2m)", link = "logit")),
+  soil = bind_rows(build_rn_lines(soil_swi_slopes, soil_fix, "swi_T15", ssf_dat_sfc10k, x_swi,
+                   "Soil", "Soil water index (T15)", link = "logit"),
+    build_rn_lines(soil_nitrog_slopes, soil_fix, "nitrog", ssf_dat_sfc10k, x_nitrog,
+                   "Soil", "Nitrogen", link = "logit"),
+    build_rn_lines(soil_orgC_slopes, soil_fix, "org_carbon", ssf_dat_sfc10k, x_orgC,
+                   "Soil", "Soil organic carbon", link = "logit")),
+  humans = bind_rows(build_rn_lines(humans_popdens_slopes, humans_fix, "pop_dens", ssf_dat_sfc10k, x_pop,
+                   "Human activity", "Population density", link = "logit"),
+    build_rn_lines(humans_thp_slopes, humans_fix, "thp", ssf_dat_sfc10k, x_thp,
+                   "Human activity", "THP", link = "logit"),
+    build_rn_lines(humans_glyph_slopes, humans_fix, "p_glyphosate", ssf_dat_sfc10k, x_glyph,
+                   "Human activity", "Glyphosate", link = "logit"),
+    build_rn_lines(humans_prop_slopes, humans_fix, "p_propiconazole", ssf_dat_sfc10k, x_prop,
+                   "Human activity", "Propiconazole", link = "logit")),
+  veg = bind_rows(build_rn_lines(veg_ndvi_slopes, veg_fix, "NDVI", ssf_dat_sfc10k, x_ndvi,
+                   "Vegetation", "NDVI", link = "logit"),
+    build_rn_lines(veg_glyph_slopes, veg_fix, "p_glyphosate", ssf_dat_sfc10k, x_glyph,
+                   "Vegetation", "Glyphosate", link = "logit"),
+    build_rn_lines(veg_prop_slopes, veg_fix, "p_propiconazole", ssf_dat_sfc10k, x_prop,
+                   "Vegetation", "Propiconazole", link = "logit")))
+
+
+# Put the random slopes in one table per model
+rn_list <- list(
+ food = bind_rows(build_rn_lines(etf_slopes, food_fix, "etf_abundance_r", ssf_dat_sfc10k, x_etf,
+                   "Food resources", "ETF abundance", link = "logit"),
+    build_rn_lines(swi_slopes, food_fix, "swi_T15", ssf_dat_sfc10k, x_swi,
+                   "Food resources", "Soil water index (T15)", link = "logit"),
+    build_rn_lines(etf_swi_slopes, food_fix, "etf_abundance_r:swi_T15", ssf_dat_sfc10k, x_etf_swi,
+                   "Food resources", "ETF × SWI", link = "logit")),
+  weather = bind_rows(build_rn_lines(temp_slopes, weather_fix, "temp_2m", ssf_dat_sfc10k, x_temp,
+                   "Weather", "Temperature (2m)", link = "logit")),
+  soil = bind_rows(build_rn_lines(soil_swi_slopes, soil_fix, "swi_T15", ssf_dat_sfc10k, x_swi,
+                   "Soil", "Soil water index (T15)", link = "logit"),
+    build_rn_lines(soil_nitrog_slopes, soil_fix, "nitrog", ssf_dat_sfc10k, x_nitrog,
+                   "Soil", "Nitrogen", link = "logit"),
+    build_rn_lines(soil_orgC_slopes, soil_fix, "org_carbon", ssf_dat_sfc10k, x_orgC,
+                   "Soil", "Soil organic carbon", link = "logit")),
+  humans = bind_rows(build_rn_lines(humans_popdens_slopes, humans_fix, "pop_dens", ssf_dat_sfc10k, x_pop,
+                   "Human activity", "Population density", link = "logit"),
+    build_rn_lines(humans_thp_slopes, humans_fix, "thp", ssf_dat_sfc10k, x_thp,
+                   "Human activity", "THP", link = "logit"),
+    build_rn_lines(humans_glyph_slopes, humans_fix, "p_glyphosate", ssf_dat_sfc10k, x_glyph,
+                   "Human activity", "Glyphosate", link = "logit"),
+    build_rn_lines(humans_prop_slopes, humans_fix, "p_propiconazole", ssf_dat_sfc10k, x_prop,
+                   "Human activity", "Propiconazole", link = "logit")),
+  veg = bind_rows(build_rn_lines(veg_ndvi_slopes, veg_fix, "NDVI", ssf_dat_sfc10k, x_ndvi,
+                   "Vegetation", "NDVI", link = "logit"),
+    build_rn_lines(veg_glyph_slopes, veg_fix, "p_glyphosate", ssf_dat_sfc10k, x_glyph,
+                   "Vegetation", "Glyphosate", link = "logit"),
+    build_rn_lines(veg_prop_slopes, veg_fix, "p_propiconazole", ssf_dat_sfc10k, x_prop,
+                   "Vegetation", "Propiconazole", link = "logit")))
+
+# Write one CSV per model/domain from rn_list
+purrr::iwalk(rn_list, function(df, nm) {
+  out_file <- paste0("random_slopes_", nm, ".csv")
+  write.csv(df, file = out_file, row.names = FALSE)
+})
+
+# Make facets by term within each domain
+plot_rn_domain <- function(dat, title, ylab) {
+  ggplot(dat, aes(x = x, y = y, colour = id, group = id)) +
+    geom_line(alpha = 0.7, linewidth = 0.7) +
+    facet_wrap(~ term, scales = "free_x") +
+    theme_bw() +
+    labs(title = title, x = NULL, y = ylab, colour = "id")
+}
+
+# Make plots 
+p_food   <- plot_rn_domain(rn_list$food,   "Food resources",    "Effect (logit)")
+p_weather<- plot_rn_domain(rn_list$weather,"Weather",           "Effect (logit)")
+p_soil   <- plot_rn_domain(rn_list$soil,   "Soil",              "Effect (logit)")
+p_humans <- plot_rn_domain(rn_list$humans, "Human activity",    "Effect (logit)")
+p_veg    <- plot_rn_domain(rn_list$veg,    "Vegetation",        "Effect (logit)")
+
+p_food
+p_weather
+p_soil
+p_humans
+p_veg
+
+##################################
+# Relative selection probability
+##################################
+
+# Make a unique row id so joins never get weird
+ssf_dat_sfc10k <- ssf_dat_sfc10k %>%
+  mutate(row_id = row_number())
+
+fits_full <- list(food = food, weather = weather, soil = soil, humans  = humans, veg = veg)
+
+# For each model: predict eta -> compute RSP=exp(eta) -> scale within individual (id)
+rsp_long <- imap_dfr(fits_full, function(fit, nm) {
+  eta <- predict(fit, newdata = ssf_dat_sfc10k, type = "link", re.form = NULL)
+  
+  tibble(
+    row_id = ssf_dat_sfc10k$row_id,
+    id     = ssf_dat_sfc10k$id,
+    model  = nm,
+    rsp    = exp(as.numeric(eta))
+  ) %>%
+    group_by(id, model) %>%
+    mutate(rsp_scaled = rsp / max(rsp, na.rm = TRUE)) %>%
+    ungroup()
+})
+
+#  One column per domain (raw + scaled)
+rsp_wide <- rsp_long %>%
+  select(row_id, model, rsp, rsp_scaled) %>%
+  pivot_wider(
+    names_from  = model,
+    values_from = c(rsp, rsp_scaled),
+    names_glue  = "rsp_{model}{ifelse(.value=='rsp_scaled','_scaled','')}"
+  )
+
+# Join (one-to-one by row_id)
+ssf_dat_sfc10k <- ssf_dat_sfc10k %>%
+  left_join(rsp_wide, by = "row_id")
+
+write.csv(ssf_dat_sfc10k, file = "data_with_RSPs.csv", row.names = FALSE)
+
+
+# Filter RSP>0.65
+thr <- 0.65
+scaled_rsp_cols <- grep("^rsp_.*_scaled$", names(ssf_dat_sfc10k), value = TRUE)
+
+ssf_filt <- ssf_dat_sfc10k %>%
+  filter(if_any(all_of(scaled_rsp_cols), ~ .x > thr)) %>%
+  arrange(case_) %>%  # draw available first, used on top
+  mutate(
+    case_f     = factor(case_, levels = c(FALSE, TRUE), labels = c("Available", "Used")),
+    alpha_case = if_else(case_, 1.0, 0.18)   # available still visible
+  )
+
+
+preds_by_domain <- list(
+  food    = c("etf_abundance_r", "swi_T15"),
+  weather = c("temp_2m", "t_precipitation", "wind_speed_10m"),
+  soil    = c("swi_T15", "nitrog", "org_carbon"),
+  humans  = c("pop_dens", "thp", "p_glyphosate", "p_propiconazole"),
+  veg     = c("NDVI", "p_glyphosate", "p_propiconazole")
+)
+
+# Convex hull points per id per facet (shaded area)
+hull_df <- function(df) {
+  df %>%
+    filter(!is.na(x), !is.na(y)) %>%
+    group_by(pair, id) %>%
+    filter(n() >= 3) %>%          # need >=3 points to make a polygon
+    slice(chull(x, y)) %>%
+    ungroup()
+}
+
+
+# Build pairwise facet plot for one domain
+plot_domain_pairs <- function(dat, predictors, domain_name, thr = NULL) {
+  
+  # keep only predictors that exist + are numeric
+  preds <- predictors[predictors %in% names(dat)]
+  preds <- preds[vapply(dat[preds], is.numeric, logical(1))]
+  if (length(preds) < 2) stop(domain_name, ": need >= 2 numeric predictors to plot.")
+  
+  pairs <- combn(preds, 2, simplify = FALSE)
+  
+  # build long df; make strip label explicit about which variable is x vs y
+  plot_df <- purrr::map_dfr(pairs, function(p) {
+    xnm <- p[1]; ynm <- p[2]
+    tibble::tibble(
+      x = dat[[xnm]],
+      y = dat[[ynm]],
+      id = dat$id,
+      case_ = dat$case_,
+      alpha_case = dplyr::if_else(dat$case_ == 1 | dat$case_ == TRUE, 1.0, 0.18),
+      pair = paste0("x: ", xnm, "   |   y: ", ynm)
+    )
+  })
+  
+  hulls <- hull_df(plot_df)
+  
+  title_txt <- if (!is.null(thr)) {
+    paste0(domain_name, ": predictor pairs (RSP_scaled > ", thr, ")")
+  } else {
+    paste0(domain_name, ": predictor pairs")
+  }
+  
+  ggplot2::ggplot(plot_df, ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_polygon(
+      data = hulls,
+      ggplot2::aes(group = interaction(pair, id), fill = id),
+      alpha = 0.10,
+      color = "grey70"
+    ) +
+    ggplot2::geom_point(
+      ggplot2::aes(color = id, alpha = alpha_case),
+      size = 1.4
+    ) +
+    ggplot2::facet_wrap(~ pair, scales = "free") +
+    ggplot2::scale_alpha_identity() +
+    ggplot2::guides(fill = "none") +
+    ggplot2::labs(
+      title = title_txt,
+      x = NULL, y = NULL, color = "id"
+    ) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      legend.position = "bottom",
+      strip.text = ggplot2::element_text(size = 9)
+    )
+}
+
+# 7) Make one plot per domain
+hv_food    <- plot_domain_pairs(ssf_filt, preds_by_domain$food,    "food")
+hv_weather <- plot_domain_pairs(ssf_filt, preds_by_domain$weather, "weather")
+hv_soil    <- plot_domain_pairs(ssf_filt, preds_by_domain$soil,    "soil")
+hv_humans  <- plot_domain_pairs(ssf_filt, preds_by_domain$humans,  "humans")
+hv_veg     <- plot_domain_pairs(ssf_filt, preds_by_domain$veg,     "veg")
+
+# Print plots
+hv_food
+hv_weather
+hv_soil
+hv_humans
+hv_veg
+
+############################################################
+# How many points are excluded after filtering for RSP>0.65
+############################################################
+thr <- 0.65
+scaled_rsp_cols <- grep("^rsp_.*_scaled$", names(ssf_niche), value = TRUE)
+
+# Before filtering
+counts_before <- ssf_niche %>%
+  mutate(niche_type = if_else(case_ == 1 | case_ == TRUE, "Realized", "Potential")) %>%
+  count(niche_type, name = "n_before")
+
+# After filtering (keep rows with any scaled RSP > threshold)
+counts_after <- ssf_niche %>%
+  filter(if_any(all_of(scaled_rsp_cols), ~ .x > thr)) %>%
+  mutate(niche_type = if_else(case_ == 1 | case_ == TRUE, "Realized", "Potential")) %>%
+  count(niche_type, name = "n_after")
+
+# Kicked out = before - after
+kicked_out_counts <- counts_before %>%
+  full_join(counts_after, by = "niche_type") %>%
+  mutate(
+    n_before = coalesce(n_before, 0L),
+    n_after  = coalesce(n_after, 0L),
+    n_kicked_out = n_before - n_after
+  )
+
+kicked_out_counts
+
+#######################################################
+# Create hypervolumes with RSP_scaled
+#######################################################
+# 0) One RSP_scaled column for niche analyses (max across domains)
+scaled_rsp_cols <- grep("^rsp_.*_scaled$", names(ssf_dat_sfc10k), value = TRUE)
+
+ssf_niche <- ssf_dat_sfc10k %>%
+  mutate(
+    RSP_scaled = do.call(pmax, c(across(all_of(scaled_rsp_cols)), list(na.rm = TRUE)))
+  )
+
+#######################
+# Niche overlap and breadth per model
+# (PCA -> convex hull in first 2 PCs -> Jaccard overlap)
+#######################
+niche_polygon_sf <- function(df, vars, case, top_frac = NULL) {
+  dat <- df %>% filter(case_ == case) %>% select(all_of(vars), RSP_scaled)
+  if (nrow(dat) < 5) return(NULL)
+  
+  # Optional: filter available steps to "core" by RSP_scaled quantile
+  if (!is.null(top_frac) && case == 0) {
+    thr_q <- quantile(dat$RSP_scaled, probs = top_frac, na.rm = TRUE)
+    dat <- dat %>% filter(RSP_scaled >= thr_q)
+  }
+  
+  env <- dat %>% select(all_of(vars)) %>% na.omit()
+  keep <- vapply(env, function(x) length(unique(x)) > 1, logical(1))
+  env <- env[, keep, drop = FALSE]
+  if (ncol(env) < 2) return(NULL)
+  
+  pca <- prcomp(env, scale. = TRUE)
+  coords <- as.data.frame(predict(pca, env))[, 1:2, drop = FALSE]
+  if (nrow(coords) < 3) return(NULL)
+  
+  ch <- chull(coords$PC1, coords$PC2)
+  coords <- coords[c(ch, ch[1]), , drop = FALSE]
+  
+  # IMPORTANT: no CRS in PCA space
+  poly <- st_sfc(st_polygon(list(as.matrix(coords))), crs = sf::NA_crs_)
+  sf::st_make_valid(poly)
+}
+
+pairwise_overlap_sf <- function(polygons_tbl, niche_type) {
+  ids <- polygons_tbl$id
+  polys <- polygons_tbl[[niche_type]]
+  
+  expand.grid(id1 = ids, id2 = ids, stringsAsFactors = FALSE) %>%
+    filter(id1 < id2) %>%
+    mutate(
+      overlap = map2_dbl(id1, id2, ~{
+        p1 <- polys[ids == .x][[1]]
+        p2 <- polys[ids == .y][[1]]
+        if (is.null(p1) || is.null(p2)) return(NA_real_)
+        
+        p1 <- sf::st_make_valid(p1)
+        p2 <- sf::st_make_valid(p2)
+        
+        inter <- try(sf::st_intersection(p1, p2), silent = TRUE)
+        uni   <- try(sf::st_union(p1, p2), silent = TRUE)
+        if (inherits(inter, "try-error") || inherits(uni, "try-error")) return(NA_real_)
+        
+        as.numeric(sf::st_area(inter) / sf::st_area(uni))
+      })
+    )
+}
+
+
+top_frac <- 0.50  # e.g. keep top 50% of available steps by RSP_scaled for potential polygons
+
+# Build overlap + breadth outputs per domain
+domain_outputs <- imap(preds_by_domain, function(vars, dom) {
+  vars <- vars[vars %in% names(ssf_niche)]
+  vars <- vars[vapply(ssf_niche[vars], is.numeric, logical(1))]
+  if (length(vars) < 2) return(NULL)
+  
+  # Polygons per id
+  polygons <- ssf_niche %>%
+    group_by(id) %>%
+    group_modify(~ tibble(
+      realized  = list(niche_polygon_sf(.x, vars, case = 1, top_frac = NULL)),
+      potential = list(niche_polygon_sf(.x, vars, case = 0, top_frac = top_frac))
+    )) %>%
+    ungroup()
+  
+  # Overlaps
+  overlaps_realized <- pairwise_overlap_sf(polygons, "realized") %>%
+    mutate(domain = dom, niche_type = "Realized")
+  overlaps_potential <- pairwise_overlap_sf(polygons, "potential") %>%
+    mutate(domain = dom, niche_type = "Potential")
+  
+  overlaps <- bind_rows(overlaps_realized, overlaps_potential)
+  
+  # Breadths (areas)
+  breadths <- polygons %>%
+    mutate(
+      realized_breadth  = map_dbl(realized,  ~ if (!is.null(.x)) as.numeric(st_area(.x)) else NA_real_),
+      potential_breadth = map_dbl(potential, ~ if (!is.null(.x)) as.numeric(st_area(.x)) else NA_real_)
+    ) %>%
+    select(id, realized_breadth, potential_breadth) %>%
+    mutate(domain = dom)
+  
+  list(polygons = polygons, overlaps = overlaps, breadths = breadths)
+})
+
+# Bind results across domains
+overlaps_all <- bind_rows(map(domain_outputs, "overlaps"))
+breadths_all <- bind_rows(map(domain_outputs, "breadths"))
+
+write.csv(overlaps_all, "niche_overlap_by_domain.csv", row.names = FALSE)
+write.csv(breadths_all, "niche_breadth_by_domain.csv", row.names = FALSE)
+
+# Heatmaps: one row per domain, columns = realized/potential
+ggplot(overlaps_all, aes(x = factor(id1), y = factor(id2), fill = overlap)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "viridis", na.value = "grey90", name = "Overlap") +
+  facet_grid(domain ~ niche_type) +
+  labs(title = "Pairwise Niche Overlap by Domain (Jaccard, PCA hulls)",
+       x = "Individual 1", y = "Individual 2") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text = element_text(face = "bold"))
+
+# Breadth bars per domain
+
+# Long format + clean labels
+breadths_long <- breadths_all %>%
+  pivot_longer(
+    cols = c(realized_breadth, potential_breadth),
+    names_to = "niche_type", values_to = "breadth"
+  ) %>%
+  mutate(
+    niche_type = recode(niche_type,
+                        realized_breadth  = "Realized",
+                        potential_breadth = "Potential"),
+    niche_type = factor(niche_type, levels = c("Potential", "Realized"))
+  )
+
+# One plot per domain
+plots <- breadths_long %>%
+  split(.$domain) %>%
+  lapply(function(df) {
+    ggplot(df, aes(x = factor(id), y = breadth, fill = niche_type)) +
+      geom_col(position = position_dodge(width = 0.7), width = 0.65) +
+      scale_fill_manual(values = c("Potential" = "#28AFB0",
+                                   "Realized"  = "#1D7874")) +
+      labs(
+        title = unique(df$domain),
+        x = "Individual ID",
+        y = "Niche breadth",
+        fill = NULL
+      ) +
+      theme_minimal(base_size = 12) +
+      theme(
+        axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = "top"
+      )
+  })
+
+# Combine side-by-side (adjust ncol as you like)
+wrap_plots(plots, ncol = length(plots)) +
+  plot_annotation(title = "Niche Breadth by Domain (polygon area in PCA space)")
+
+###################
+# Repeatability (Realized & Potential) per domain
+###################
+# Helpers: robust extraction of repeatability estimate + CI
+get_R_CI_id <- function(rpt_res) {
+  out <- list(R = NA_real_, CI_low = NA_real_, CI_high = NA_real_)
+  
+  # ---- extract point estimate ----
+  Robj <- rpt_res$R
+  picked_name <- NA_character_
+  
+  if (!is.null(Robj)) {
+    rn <- names(Robj)
+    
+    if (!is.null(rn) && "id" %in% rn) {
+      out$R <- as.numeric(Robj[["id"]])
+      picked_name <- "id"
+    } else if (!is.null(rn) && length(rn) > 0) {
+      hit <- grep("^id$|\\bid\\b|id", rn, ignore.case = TRUE, value = TRUE)
+      if (length(hit) > 0) {
+        out$R <- as.numeric(Robj[[hit[1]]])
+        picked_name <- hit[1]
+      } else {
+        out$R <- suppressWarnings(as.numeric(Robj[[1]]))
+        picked_name <- rn[1]
+      }
+    } else if (is.numeric(Robj) && length(Robj) >= 1) {
+      out$R <- as.numeric(Robj[1])
+    } else {
+      vals <- suppressWarnings(as.numeric(unlist(Robj)))
+      vals <- vals[is.finite(vals)]
+      if (length(vals) > 0) out$R <- vals[1]
+    }
+  }
+  
+  # extract empirical CI, matching the same row where possible
+  CI <- rpt_res$CI_emp
+  if (!is.null(CI)) {
+    CI <- tryCatch(as.matrix(CI), error = function(e) NULL)
+    
+    if (!is.null(CI) && nrow(CI) >= 1 && ncol(CI) >= 1) {
+      rnm <- rownames(CI)
+      cnm <- colnames(CI)
+      
+      # find lower/upper columns robustly
+      low_col <- NA_integer_
+      high_col <- NA_integer_
+      
+      if (!is.null(cnm)) {
+        low_candidates  <- c("2.5%", "2.5 %", "lower", "lwr")
+        high_candidates <- c("97.5%", "97.5 %", "upper", "upr")
+        
+        low_hit  <- which(cnm %in% low_candidates)
+        high_hit <- which(cnm %in% high_candidates)
+        
+        if (length(low_hit) > 0) low_col <- low_hit[1]
+        if (length(high_hit) > 0) high_col <- high_hit[1]
+        
+        # fallback: percentile-looking columns
+        if (is.na(low_col)) {
+          low_hit2 <- grep("2\\.5", cnm)
+          if (length(low_hit2) > 0) low_col <- low_hit2[1]
+        }
+        if (is.na(high_col)) {
+          high_hit2 <- grep("97\\.5", cnm)
+          if (length(high_hit2) > 0) high_col <- high_hit2[1]
+        }
+      }
+      
+      # row matching
+      row_idx <- NA_integer_
+      if (!is.null(rnm) && length(rnm) > 0) {
+        if (!is.na(picked_name) && picked_name %in% rnm) {
+          row_idx <- which(rnm == picked_name)[1]
+        } else if ("id" %in% rnm) {
+          row_idx <- which(rnm == "id")[1]
+        } else {
+          hit_row <- grep("^id$|\\bid\\b|id", rnm, ignore.case = TRUE)
+          if (length(hit_row) > 0) row_idx <- hit_row[1]
+        }
+      }
+      if (is.na(row_idx)) row_idx <- 1L
+      
+      if (!is.na(low_col) && !is.na(high_col)) {
+        out$CI_low  <- suppressWarnings(as.numeric(CI[row_idx, low_col]))
+        out$CI_high <- suppressWarnings(as.numeric(CI[row_idx, high_col]))
+      } else {
+        # fallback: first two finite values in selected row
+        vals <- suppressWarnings(as.numeric(CI[row_idx, ]))
+        vals <- vals[is.finite(vals)]
+        if (length(vals) >= 2) {
+          out$CI_low  <- vals[1]
+          out$CI_high <- vals[2]
+        }
+      }
+    }
+  }
+  
+  out
+}
+
+# Compute repeatability table for a set of variables
+compute_repeatability_tbl <- function(dat, vars, niche_label, domain_label,
+                                      nboot = 1000, npermut = 1000) {
+  
+  # keep only vars that exist and are numeric
+  vars <- vars[vars %in% names(dat)]
+  vars <- vars[vapply(dat[vars], is.numeric, logical(1))]
+  
+  if (length(vars) == 0) {
+    return(tibble(
+      variable = character(),
+      betweenIndR = numeric(),
+      CI_low = numeric(),
+      CI_high = numeric(),
+      withinIndR = numeric(),
+      niche_type = character(),
+      domain = character()
+    ))
+  }
+  
+  map_dfr(vars, function(v) {
+    x <- dat[[v]]
+    
+    # skip if no variance / too few observations
+    if (all(is.na(x)) || length(unique(na.omit(x))) < 2) {
+      return(NULL)
+    }
+    
+    form <- as.formula(paste(v, "~ (1|id)"))
+    
+    rpt_res <- tryCatch(
+      rpt(
+        form,
+        grname   = "id",
+        data     = dat,
+        datatype = "Gaussian",
+        nboot    = nboot,
+        npermut  = npermut
+      ),
+      error = function(e) {
+        message(sprintf("rpt() failed for domain='%s', variable='%s': %s",
+                        domain_label, v, e$message))
+        NULL
+      }
+    )
+    
+    if (is.null(rpt_res)) return(NULL)
+    
+    rc <- get_R_CI_id(rpt_res)
+    
+    # guard against impossible/odd values
+    R_id <- rc$R
+    CI_low <- rc$CI_low
+    CI_high <- rc$CI_high
+    
+    # clamp to [0,1] for plotting if finite (repeatability scale)
+    if (is.finite(R_id)) R_id <- max(min(R_id, 1), 0)
+    if (is.finite(CI_low)) CI_low <- max(min(CI_low, 1), 0)
+    if (is.finite(CI_high)) CI_high <- max(min(CI_high, 1), 0)
+    
+    # ensure CI order if both finite
+    if (is.finite(CI_low) && is.finite(CI_high) && CI_low > CI_high) {
+      tmp <- CI_low; CI_low <- CI_high; CI_high <- tmp
+    }
+    
+    tibble(
+      variable    = v,
+      betweenIndR = R_id,
+      CI_low      = CI_low,
+      CI_high     = CI_high,
+      withinIndR  = ifelse(is.finite(R_id), 1 - R_id, NA_real_),
+      niche_type  = niche_label,
+      domain      = domain_label
+    )
+  })
+}
+
+# Build repeatability table (core niche rows only)
+# Assumes objects already exist:
+#   - ssf_niche
+#   - preds_by_domain (named list of predictor vectors by domain)
+
+thr <- 0.65
+
+scaled_rsp_cols <- grep("^rsp_.*_scaled$", names(ssf_niche), value = TRUE)
+
+if (length(scaled_rsp_cols) == 0) {
+  stop("No columns matching '^rsp_.*_scaled$' found in ssf_niche.")
+}
+if (!"case_" %in% names(ssf_niche)) stop("Column 'case_' not found in ssf_niche.")
+if (!"id" %in% names(ssf_niche)) stop("Column 'id' not found in ssf_niche.")
+
+ssf_niche_core <- ssf_niche %>%
+  filter(if_any(all_of(scaled_rsp_cols), ~ .x > thr))
+
+repeatability_all_core <- imap_dfr(preds_by_domain, function(vars, dom) {
+  
+  used_tbl <- compute_repeatability_tbl(
+    dat = ssf_niche_core %>% filter(case_ == 1),
+    vars = vars,
+    niche_label = paste0("Realized (RSP> ", thr, ")"),
+    domain_label = dom
+  )
+  
+  avail_tbl <- compute_repeatability_tbl(
+    dat = ssf_niche_core %>% filter(case_ == 0),
+    vars = vars,
+    niche_label = paste0("Potential (RSP> ", thr, ")"),
+    domain_label = dom
+  )
+  
+  bind_rows(used_tbl, avail_tbl)
+})
+
+print(repeatability_all_core, n = Inf)
+write.csv(
+  repeatability_all_core,
+  sprintf("repeatability_by_domain_RSPgt%s_anydomain.csv", gsub("\\.", "", as.character(thr))),
+  row.names = FALSE
+)
+
+
+# Diagnostics (optional but helpful)
+
+cat("\nRows with estimate outside CI (should usually be none/few):\n")
+print(
+  repeatability_all_core %>%
+    filter(is.finite(betweenIndR), is.finite(CI_low), is.finite(CI_high)) %>%
+    mutate(outside_CI = betweenIndR < CI_low | betweenIndR > CI_high) %>%
+    filter(outside_CI),
+  n = Inf
+)
+
+
+# Plot repeatabilities by domain (one panel per domain)
+# uses POINT + CI (better than bars for zero estimates)
+
+repeatability_plot <- repeatability_all_core %>%
+  mutate(
+    niche_type_plot = case_when(
+      str_detect(niche_type, regex("^Realized", ignore_case = TRUE))  ~ "Realized",
+      str_detect(niche_type, regex("^Potential", ignore_case = TRUE)) ~ "Potential",
+      TRUE ~ niche_type
+    ),
+    niche_type_plot = factor(niche_type_plot, levels = c("Potential", "Realized"))
+  ) %>%
+  # keep rows with finite estimate and CI for plotting
+  filter(is.finite(betweenIndR), is.finite(CI_low), is.finite(CI_high))
+
+# optional: preserve current domain order of appearance
+domain_levels <- unique(repeatability_plot$domain)
+
+# optional: prettier variable labels (basic cleanup)
+repeatability_plot <- repeatability_plot %>%
+  mutate(
+    variable_label = variable %>%
+      str_replace_all("_", " ") %>%
+      str_replace_all("\\bndvi\\b", "NDVI") %>%
+      str_trim()
+  )
+
+plots_by_domain <- map(domain_levels, function(dom) {
+  dat_dom <- repeatability_plot %>%
+    filter(domain == dom) %>%
+    mutate(
+      # order variables within each panel by mean repeatability (across niche types)
+      variable_label = fct_reorder(variable_label, betweenIndR, .fun = mean, .desc = FALSE)
+    )
+  
+  pd <- position_dodge(width = 0.6)
+  
+  ggplot(dat_dom, aes(x = variable_label, y = betweenIndR, colour = niche_type_plot)) +
+    geom_errorbar(
+      aes(ymin = CI_low, ymax = CI_high),
+      position = pd,
+      width = 0.18,
+      linewidth = 0.7,
+      alpha = 0.95
+    ) +
+    geom_point(
+      position = pd,
+      size = 2.6
+    ) +
+    coord_flip() +
+    scale_colour_manual(
+      values = c(
+        "Potential" = "#28AFB0",
+        "Realized"  = "#1D7874"
+      ),
+      drop = FALSE
+    ) +
+    scale_y_continuous(
+      limits = c(0, 1),
+      expand = expansion(mult = c(0.02, 0.05))
+    ) +
+    labs(
+      title = dom,
+      x = NULL,
+      y = "Between-individual R",
+      colour = NULL
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+      legend.position = "top",
+      plot.title = element_text(face = "bold"),
+      axis.text.y = element_text(hjust = 1),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.y = element_blank()
+    )
+})
+
+names(plots_by_domain) <- domain_levels
+
+final_plot <- wrap_plots(plots_by_domain, ncol = 2, guides = "collect") &
+  theme(legend.position = "top")
+
+final_plot
+
+#########################################################################################
+save.image(file = "indiv_niche_RSP_rpt_Jacc_20260224.RData")
