@@ -1,3 +1,4 @@
+This file is the dataset that was used for the study analysis. Below you can find an explanation of each column.
 All the details about the compilation of the dataset can be found here: [https://ecoevorxiv.org/repository/view/9796/](url)
 
 |     Column name        |                 Description                    |
