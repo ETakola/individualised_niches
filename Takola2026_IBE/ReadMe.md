@@ -2,6 +2,7 @@
 This is a folder to support a manuscript on the quantification of individualised niches, as they were defined in Takola & Schielzeth (2022). 
 
 This is a conceptual figure of the main idea behind the study. 
+
 <img width="547" height="185" alt="UpdatedFig" src="https://github.com/user-attachments/assets/d4bbccee-c482-4795-b84b-a2944e117f9b" />
 
 
