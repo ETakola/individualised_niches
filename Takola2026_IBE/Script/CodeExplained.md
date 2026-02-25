@@ -1,8 +1,7 @@
 <details>
 <summary>1) Setup and data preparation</summary>
 <li> Load required packages </li> <li> Read SSF dataset and keep original copy </li> <li> Drop geometry for non-spatial modeling </li> <li> Remove rare crop types (keep crop types with ≥ 31 obs) </li>
-</ul>
-<details>
+</details>
 <details>
 <summary>2) Fit SSF models by ecological domain (GLMMs with individual-level random slopes)</summary>
 <li> Fit food resources model (binomial SSF) </li> <li> Extract food fixed effects </li> <li> Extract food random slope BLUPs (ETF, SWI, ETF×SWI) </li> <li> Fit weather model (temp, precipitation, wind) </li> <li> Extract weather fixed effects </li> <li> Extract weather random slope BLUPs (temperature) </li> <li> Fit soil model (SWI, nitrogen, organic carbon + step-level RE) </li> <li> Extract soil fixed effects </li> <li> Extract soil random slope BLUPs (SWI, N, orgC) </li> <li> Fit human activity model (pop dens, THP, crop intensity, pesticides) </li> <li> Extract human activity fixed effects </li> <li> Extract human activity random slope BLUPs (pop dens, THP, glyphosate, propiconazole) </li> <li> Fit vegetation model (NDVI, crop type, pesticides) </li> <li> Extract vegetation fixed effects </li> <li> Extract vegetation random slope BLUPs (NDVI, glyphosate, propiconazole) </li>
