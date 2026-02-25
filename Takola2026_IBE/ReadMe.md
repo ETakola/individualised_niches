@@ -2,7 +2,8 @@
 This is a folder to support a manuscript on the quantification of individualised niches, as they were defined in Takola & Schielzeth (2022). 
 
 This is a conceptual figure of the main idea behind the study. 
-<img width="680" height="243" alt="Fig1_conceptplots" src="https://github.com/user-attachments/assets/3a61876c-028e-4c29-8c04-b5c42252dda4" />
+<img width="1047" height="385" alt="UpdatedFig" src="https://github.com/user-attachments/assets/d4bbccee-c482-4795-b84b-a2944e117f9b" />
+
 
 Figure: Heuristic representation of the different niche levels. A) A community can be represented as a set of species where each one occupies a different niche. B) A species can be represented as a set of meta-populations with different niches. C) A population consists of multiple individuals with different individualised niches (potential niche is shown with transparent dots, realized niche is shown with bold dots). 
 ## What is the individualised niche?
