@@ -1,0 +1,531 @@
+################################################################################
+# Individualized-niche pipeline 
+################################################################################
+
+######################### 
+# Load packages # Load all packages needed for the workflow.
+#########################
+rm(list = ls()) # Clear the R environment
+library(dplyr) 
+library(tidyr) 
+library(purrr) 
+library(stringr) 
+library(ggplot2) 
+library(glmmTMB)
+library(broom.mixed) 
+library(performance)
+library(sf) 
+library(sp) 
+library(adehabitatHR) 
+library(viridis) 
+library(forcats) 
+library(rptR) 
+library(corrplot) 
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(lubridate)
+library(sf)
+library(sp)
+library(adehabitatHR)
+library(viridis)
+library(nicheROVER)
+library(ggrepel)
+
+######################### 
+# Load data # Read the prepared used/available RSF dataset.
+######################### 
+
+df_rsp <- read.csv(file.choose(), header = TRUE, sep = ",") # Load data_with_RSPs.csv
+
+
+######################### 
+# Output folders # Define folders where plots, tables, and objects will be saved.
+######################### 
+
+plot_dir <- "plots_RSF_workflow" # Folder for saved figures.
+table_dir <- "tables_RSF_workflow" # Folder for saved tables.
+object_dir <- "objects_RSF_workflow" # Folder for saved R objects.
+
+if (!dir.exists(plot_dir)) dir.create(plot_dir) # Create plot folder if it does not already exist.
+if (!dir.exists(table_dir)) dir.create(table_dir) # Create table folder if it does not already exist.
+if (!dir.exists(object_dir)) dir.create(object_dir) # Create object folder if it does not already exist.
+
+
+################################################################################ 
+# Data structure and preprocessing 
+################################################################################ 
+# Filter crop types <30
+if ("crop_type" %in% names(df)) { 
+  df <- df %>% 
+    filter(crop_type %in% names(table(crop_type))[table(crop_type) >= 31]) # Keep crop types with at least 31 observations to avoid sparse factor levels.
+} # End optional crop-type filtering.
+
+df <- df %>%
+  mutate(across(where(is.character), as.factor)) # Convert character columns to factors for modelling.
+
+# Create objects with numerical and categorical predictors
+num_vars <- c("etf_abundance_r", "moon_dist", "pop_dens", "p_glyphosate", "p_propiconazole", 
+              "temp_2m", "t_precipitation", "wind_speed_10m", "swi_T10", "thp", "org_carbon", "nitrog", "NDVI")# Define numerical environmental predictors. 
+
+factor_vars <- c("moon_phase", "crop_intens", "crop_type") # Define categorical environmental predictors.
+
+# Scale predictors with scale()
+df <- df %>% 
+  mutate(across(all_of(num_vars), ~ as.numeric(scale(.x))), # Scale numeric environmental predictors to mean 0 and SD 1.
+         across(all_of(factor_vars), ~ as.factor(.x)), # Ensure categorical predictors are factors.
+         id = as.factor(id), # Ensure ID is a factor.
+         case_ = as.integer(case_)) %>% 
+  filter(!is.na(case_), !is.na(id)) 
+
+print(table(df$case_, useNA = "ifany")) # Print counts of used and available points to verify coding.
+exclude_from_predictors <- c("burst_", "x1_", "y1_", "sl_", "ta_", "step_id_", "log_sl_", "cos_ta_")
+
+df <- df %>% dplyr::select(-dplyr::any_of(exclude_from_predictors))
+
+if (length(num_vars) > 1) { # Only make a correlation plot if there are at least two numeric predictors.
+  numeric_df <- df[, num_vars] # Extract numeric environmental predictors.
+  cor_matrix <- cor(numeric_df, use = "pairwise.complete.obs") # Calculate pairwise correlations using available complete pairs.
+  
+  png(file.path(plot_dir, "00_correlation_matrix.png"), width = 1400, height = 1200, res = 180) # Open a PNG device for the correlation plot.
+  corrplot( # Draw the correlation plot.
+    cor_matrix, # Use the correlation matrix.
+    method = "color", # Show correlations as coloured cells.
+    tl.cex = 0.5, # Use small text labels.
+    tl.col = "black", # Make labels black.
+    col = rev(colorRampPalette(c("#780000", "#E5E5E5", "#003049"))(200)) # Define the colour scale.
+  ) # End correlation plot call.
+  dev.off() # Close the PNG device and save the plot.
+} # End optional correlation plot.
+
+################################################################################ 
+# Mixed-effects RSF with random slopes per individual 
+################################################################################
+#######################################
+# Food resources
+#######################################
+# Fit only random slopes, not random intercept to avoid collapses
+food <- glmmTMB(case_ ~ etf_abundance_r * swi_T15 +
+                  (1 | id) +
+                  (0 + etf_abundance_r | id) +
+                  (0 + swi_T15 | id) +
+                  (0 + etf_abundance_r:swi_T15 | id),
+                data = df_rsp, family = binomial())
+summary(food)
+
+# fixed effects table 
+food_fix <- broom.mixed::tidy(food, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "food") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+# random-effects conditional modes (BLUPs) by grouping factor
+etf_slopes <- broom.mixed::tidy(food, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "etf_abundance_r") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+swi_slopes <- broom.mixed::tidy(food, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "swi_T15") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+etf_swi_slopes <- broom.mixed::tidy(food, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "etf_abundance_r:swi_T15") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Weather
+#######################################
+# Correlation between temp_2m and t_precipitation is -0.008
+# Individuals do not differ in wind_speed
+weather <- glmmTMB(case_ ~ temp_2m + t_precipitation + wind_speed_10m +
+                     (1 | id) + (0 + temp_2m | id),
+                   data = df_rsp, family = binomial(link = "logit"))
+summary(weather)
+
+# fixed effects table 
+weather_fix <- broom.mixed::tidy(weather, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "weather") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+# random-effects conditional modes (BLUPs) by grouping factor
+temp_slopes <- broom.mixed::tidy(weather, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "temp_2m") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Soil
+#######################################
+# AIC of model with random slopes is lower than model without
+soil <- glmmTMB(
+  case_ ~ swi_T15 + nitrog + org_carbon +
+    (1 | id) +
+    (0 + swi_T15 | id) +
+    (0 + nitrog | id) +
+    (0 + org_carbon | id),
+  data = df_rsp,
+  family = binomial()
+)
+summary(soil)
+
+# fixed effects table 
+soil_fix <- broom.mixed::tidy(soil, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "soil") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+
+# random-effects conditional modes (BLUPs) by grouping factor
+soil_swi_slopes <- broom.mixed::tidy(soil, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "swi_T15") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+soil_nitrog_slopes <- broom.mixed::tidy(soil, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "nitrog") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+soil_orgC_slopes <- broom.mixed::tidy(soil, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "org_carbon") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Human activity
+#######################################
+# Don't fit random slopes for cropping intensity because it is a factor
+humans <- glmmTMB(
+  case_ ~ pop_dens + thp + crop_intens + p_glyphosate + p_propiconazole +
+    (1 | id) +
+    (0 + pop_dens | id) +
+    (0 + thp | id) +
+    (0 + p_glyphosate | id) +
+    (0 + p_propiconazole | id),
+  data = df_rsp,
+  family = binomial(link = "logit"),
+  control = glmmTMBControl(optimizer = optim, optArgs = list(method = "BFGS"))
+)
+summary(humans)
+
+# fixed effects table 
+humans_fix <- broom.mixed::tidy(humans, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "humans") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+
+# random-effects conditional modes (BLUPs) by grouping factor
+humans_popdens_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "pop_dens") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+humans_thp_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "thp") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+humans_glyph_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_glyphosate") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+humans_prop_slopes <- broom.mixed::tidy(humans, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_propiconazole") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#######################################
+# Vegetation
+#######################################
+veg <- glmmTMB(
+  case_ ~ NDVI + crop_type + p_glyphosate + p_propiconazole +
+    (1 | id) +
+    (0 + NDVI | id) +
+    (0 + p_glyphosate | id) +
+    (0 + p_propiconazole | id),
+  data = df_rsp,
+  family = binomial(link = "logit"),
+  control = glmmTMBControl(optimizer = optim, optArgs = list(method = "BFGS")))
+summary(veg)
+
+# fixed effects table
+veg_fix <- broom.mixed::tidy(veg, effects = "fixed", conf.int = TRUE) %>%
+  dplyr::mutate(model = "veg") %>%
+  dplyr::select(model, term, estimate, std.error, conf.low, conf.high, statistic, p.value)
+
+# random-effects conditional modes (BLUPs) by grouping factor
+veg_ndvi_slopes <- broom.mixed::tidy(veg, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "NDVI") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+veg_glyph_slopes <- broom.mixed::tidy(veg, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_glyphosate") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+veg_prop_slopes <- broom.mixed::tidy(veg, effects = "ran_vals") %>%
+  dplyr::filter(group == "id", term == "p_propiconazole") %>%
+  dplyr::transmute(id = level, slope_blup = estimate, slope_se = std.error)
+
+#################################################
+# Plot model estimates for all model predictors
+#################################################
+fix_all <- bind_rows(food_fix, weather_fix, soil_fix, humans_fix, veg_fix) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    model = recode(model,
+                   food = "Food resources",
+                   weather = "Weather",
+                   soil = "Soil",
+                   humans = "Human activity",
+                   veg = "Vegetation"
+    ),
+    
+    # set facet order here
+    model = factor(model, levels = c(
+      "Human activity",
+      "Food resources",
+      "Weather",
+      "Vegetation",
+      "Soil")),
+    
+    term = recode(term,
+                  cos_ta_ = "cos(turn angle)",
+                  log_sl_ = "log(step length)",
+                  etf_abundance_r = "ETF abundance",
+                  swi_T15 = "Soil water index (T15)",
+                  `etf_abundance_r:swi_T15` = "ETF × SWI",
+                  temp_2m = "Temperature (2m)",
+                  t_precipitation = "Precipitation",
+                  wind_speed_10m = "Wind speed (10m)",
+                  nitrog = "Nitrogen",
+                  org_carbon = "Soil organic carbon",
+                  pop_dens = "Population density",
+                  thp = "THP",
+                  p_glyphosate = "Glyphosate",
+                  p_propiconazole = "Propiconazole",
+                  NDVI = "NDVI",
+                  crop_typeBarley = "Barley crops",
+                  crop_typeCommon_wheat = "Common wheat crops",
+                  crop_typeGrassland = "Grasslands",
+                  crop_typeMaize = "Maize crops",
+                  crop_typeOther_fod_crops = "Other fodder crops",
+                  crop_typePotatoes = "Potato crops",
+                  crop_typePuls_veg_flow = "Pulses/Vegetables/Flowers",
+                  crop_typeSugar_beet = "Sugar beet crops",
+                  crop_typeSunflower = "Sunflower crops",
+                  crop_typewater = "Water",
+                  crop_typeWood_shrubland = "Woody shrublands",
+                  `crop_intens multi_season` = "Multi-season cropping",
+                  `crop_intensDouble-season` = "Double-season cropping",
+                  `crop_intensSingle_season` = "Single-season cropping"
+    )
+  )
+write.csv(fix_all, file = "fixedeffects_glmmTMB.csv", row.names = FALSE)
+# mean–error (dot + whisker) plot
+ggplot(fix_all, aes(x = estimate, y = fct_rev(term))) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
+  geom_point(size = 2) +
+  facet_wrap(~ model, scales = "free_y") +
+  theme_bw() +
+  labs(x = "Estimate (95% CI)", y = NULL) +
+  theme(
+    strip.background = element_rect(fill = "#440154", color = "#440154"),
+    strip.text = element_text(color = "white")
+  )
+###################################
+# Now let's plot the random slopes
+###################################
+# fixed slope helper (from your *_fix tables)
+get_beta <- function(fix_tbl, term_name) {
+  fix_tbl %>% filter(term == term_name) %>% pull(estimate) %>% .[1]
+}
+
+# x-seq helper (from your data)
+make_xseq <- function(dat, var, n = 60) {
+  seq(min(dat[[var]], na.rm = TRUE),
+      max(dat[[var]], na.rm = TRUE),
+      length.out = n)
+}
+
+# build straight-line reaction norms for one slope object
+build_rn_lines <- function(slopes_tbl, fix_tbl, term_name, dat, xvec, model_label, term_label, link = c("identity","logit")) {
+  link <- match.arg(link)
+  beta <- get_beta(fix_tbl, term_name)
+  
+  slopes_tbl %>%
+    mutate(
+      model = model_label,
+      term  = term_label,
+      slope_total = beta + slope_blup
+    ) %>%
+    crossing(x = xvec) %>%
+    mutate(
+      eta = slope_total * x,                     # straight line on link/identity scale
+      y   = if (link == "logit") eta else eta    # keep as eta to guarantee straight lines
+    ) %>%
+    dplyr::select(model, term, id, x, y)
+}
+
+# create x grids
+x_etf       <- make_xseq(df_rsp, "etf_abundance_r", 60)
+x_swi       <- make_xseq(df_rsp, "swi_T15", 60)
+x_temp      <- make_xseq(df_rsp, "temp_2m", 60)
+x_nitrog    <- make_xseq(df_rsp, "nitrog", 60)
+x_orgC      <- make_xseq(df_rsp, "org_carbon", 60)
+x_pop       <- make_xseq(df_rsp, "pop_dens", 60)
+x_thp       <- make_xseq(df_rsp, "thp", 60)
+x_glyph     <- make_xseq(df_rsp, "p_glyphosate", 60)
+x_prop      <- make_xseq(df_rsp, "p_propiconazole", 60)
+x_ndvi      <- make_xseq(df_rsp, "NDVI", 60)
+
+# interaction slope: use product as x (straight line in the interaction term)
+x_etf_swi <- {
+  prod <- df_rsp$etf_abundance_r * df_rsp$swi_T15
+  seq(min(prod, na.rm = TRUE), max(prod, na.rm = TRUE), length.out = 60)
+}
+
+# Put the random slopes in one table per model
+rn_list <- list(
+  food = bind_rows(build_rn_lines(etf_slopes, food_fix, "etf_abundance_r", df_rsp, x_etf,
+                                  "Food resources", "ETF abundance", link = "logit"),
+                   build_rn_lines(swi_slopes, food_fix, "swi_T15", df_rsp, x_swi,
+                                  "Food resources", "Soil water index (T15)", link = "logit"),
+                   build_rn_lines(etf_swi_slopes, food_fix, "etf_abundance_r:swi_T15", ssf_dat_sfc10k, x_etf_swi,
+                                  "Food resources", "ETF × SWI", link = "logit")),
+  weather = bind_rows(build_rn_lines(temp_slopes, weather_fix, "temp_2m", df_rsp, x_temp,
+                                     "Weather", "Temperature (2m)", link = "logit")),
+  soil = bind_rows(build_rn_lines(soil_swi_slopes, soil_fix, "swi_T15", df_rsp, x_swi,
+                                  "Soil", "Soil water index (T15)", link = "logit"),
+                   build_rn_lines(soil_nitrog_slopes, soil_fix, "nitrog", df_rsp, x_nitrog,
+                                  "Soil", "Nitrogen", link = "logit"),
+                   build_rn_lines(soil_orgC_slopes, soil_fix, "org_carbon", df_rsp, x_orgC,
+                                  "Soil", "Soil organic carbon", link = "logit")),
+  humans = bind_rows(build_rn_lines(humans_popdens_slopes, humans_fix, "pop_dens", df_rsp, x_pop,
+                                    "Human activity", "Population density", link = "logit"),
+                     build_rn_lines(humans_thp_slopes, humans_fix, "thp", df_rsp, x_thp,
+                                    "Human activity", "THP", link = "logit"),
+                     build_rn_lines(humans_glyph_slopes, humans_fix, "p_glyphosate", df_rsp, x_glyph,
+                                    "Human activity", "Glyphosate", link = "logit"),
+                     build_rn_lines(humans_prop_slopes, humans_fix, "p_propiconazole", df_rsp, x_prop,
+                                    "Human activity", "Propiconazole", link = "logit")),
+  veg = bind_rows(build_rn_lines(veg_ndvi_slopes, veg_fix, "NDVI", df_rsp, x_ndvi,
+                                 "Vegetation", "NDVI", link = "logit"),
+                  build_rn_lines(veg_glyph_slopes, veg_fix, "p_glyphosate", df_rsp, x_glyph,
+                                 "Vegetation", "Glyphosate", link = "logit"),
+                  build_rn_lines(veg_prop_slopes, veg_fix, "p_propiconazole", df_rsp, x_prop,
+                                 "Vegetation", "Propiconazole", link = "logit")))
+
+
+# Put the random slopes in one table per model
+rn_list <- list(
+  food = bind_rows(build_rn_lines(etf_slopes, food_fix, "etf_abundance_r", df_rsp, x_etf,
+                                  "Food resources", "ETF abundance", link = "logit"),
+                   build_rn_lines(swi_slopes, food_fix, "swi_T15", df_rsp, x_swi,
+                                  "Food resources", "Soil water index (T15)", link = "logit"),
+                   build_rn_lines(etf_swi_slopes, food_fix, "etf_abundance_r:swi_T15", df_rsp, x_etf_swi,
+                                  "Food resources", "ETF × SWI", link = "logit")),
+  weather = bind_rows(build_rn_lines(temp_slopes, weather_fix, "temp_2m", df_rsp, x_temp,
+                                     "Weather", "Temperature (2m)", link = "logit")),
+  soil = bind_rows(build_rn_lines(soil_swi_slopes, soil_fix, "swi_T15", df_rsp, x_swi,
+                                  "Soil", "Soil water index (T15)", link = "logit"),
+                   build_rn_lines(soil_nitrog_slopes, soil_fix, "nitrog", df_rsp, x_nitrog,
+                                  "Soil", "Nitrogen", link = "logit"),
+                   build_rn_lines(soil_orgC_slopes, soil_fix, "org_carbon", df_rsp, x_orgC,
+                                  "Soil", "Soil organic carbon", link = "logit")),
+  humans = bind_rows(build_rn_lines(humans_popdens_slopes, humans_fix, "pop_dens", df_rsp, x_pop,
+                                    "Human activity", "Population density", link = "logit"),
+                     build_rn_lines(humans_thp_slopes, humans_fix, "thp", df_rsp, x_thp,
+                                    "Human activity", "THP", link = "logit"),
+                     build_rn_lines(humans_glyph_slopes, humans_fix, "p_glyphosate", df_rsp, x_glyph,
+                                    "Human activity", "Glyphosate", link = "logit"),
+                     build_rn_lines(humans_prop_slopes, humans_fix, "p_propiconazole", df_rsp, x_prop,
+                                    "Human activity", "Propiconazole", link = "logit")),
+  veg = bind_rows(build_rn_lines(veg_ndvi_slopes, veg_fix, "NDVI", df_rsp, x_ndvi,
+                                 "Vegetation", "NDVI", link = "logit"),
+                  build_rn_lines(veg_glyph_slopes, veg_fix, "p_glyphosate", df_rsp, x_glyph,
+                                 "Vegetation", "Glyphosate", link = "logit"),
+                  build_rn_lines(veg_prop_slopes, veg_fix, "p_propiconazole", df_rsp, x_prop,
+                                 "Vegetation", "Propiconazole", link = "logit")))
+
+# Write one CSV per model/domain from rn_list
+purrr::iwalk(rn_list, function(df, nm) {
+  out_file <- paste0("random_slopes_", nm, ".csv")
+  write.csv(df, file = out_file, row.names = FALSE)
+})
+
+# Make facets by term within each domain
+plot_rn_domain <- function(dat, title, ylab) {
+  ggplot(dat, aes(x = x, y = y, colour = id, group = id)) +
+    geom_line(alpha = 0.7, linewidth = 0.7) +
+    facet_wrap(~ term, scales = "free_x") +
+    theme_bw() +
+    labs(title = title, x = NULL, y = ylab, colour = "id")
+}
+
+# Make plots 
+p_food   <- plot_rn_domain(rn_list$food,   "Food resources",    "Effect (logit)")
+p_weather<- plot_rn_domain(rn_list$weather,"Weather",           "Effect (logit)")
+p_soil   <- plot_rn_domain(rn_list$soil,   "Soil",              "Effect (logit)")
+p_humans <- plot_rn_domain(rn_list$humans, "Human activity",    "Effect (logit)")
+p_veg    <- plot_rn_domain(rn_list$veg,    "Vegetation",        "Effect (logit)")
+
+p_food
+p_weather
+p_soil
+p_humans
+p_veg
+
+
+################################################################################ 
+# Relative selection probabilities / relative selection strength
+################################################################################ 
+# This is individual-specific relative selection strength from the fitted RSF. 
+
+eta <- predict( # Predict selection score for every location.
+  rsf, # Use fitted RSF model.
+  newdata = df, # Predict for the original used/available dataset.
+  type = "link", # Predict on logit scale.
+  re.form = NULL # Include individual random effects.
+)
+
+df_rsp <- df %>% 
+  dplyr::mutate( # Add prediction column to the dataset.
+    eta = as.numeric(eta) # Store linear predictor as numeric.
+  ) %>% 
+  dplyr::group_by(id) %>% # Scale within each individual.
+  dplyr::mutate( # Add scaled RSP.
+    RSP_scaled = exp(eta - max(eta, na.rm = TRUE)) # Stable exponentiation; max RSP per individual is 1.
+  ) %>% # Continue pipeline.
+  dplyr::ungroup() %>% # Remove grouping.
+  dplyr::mutate( # Add niche-component label.
+    niche_type = dplyr::if_else(case_ == 1, "Realized", "Available") # Label used vs available locations.
+  ) 
+
+write.csv(df_rsp, 
+          file.path(table_dir, "df_with_RSPs.csv"), # Output file path.
+          row.names = FALSE # Do not write row names.
+) # End write.csv.
+
+saveRDS( df_rsp, file.path(object_dir, "df_rsp.rds")) 
+
+rsp_summary <- df_rsp %>% 
+  dplyr::group_by(id, case_) %>% # Summarise by individual and used/available status.
+  dplyr::summarise( # Calculate summary statistics.
+    n = dplyr::n(), # Count rows.
+    mean_RSP_scaled = mean(RSP_scaled, na.rm = TRUE), # Mean RSP.
+    median_RSP_scaled = median(RSP_scaled, na.rm = TRUE), # Median RSP.
+    max_RSP_scaled = max(RSP_scaled, na.rm = TRUE), # Maximum RSP.
+    .groups = "drop" # Remove grouping after summary.
+  ) %>% # Continue pipeline.
+  dplyr::mutate( # Add readable label.
+    case_label = dplyr::if_else(case_ == 1, "Used", "Available") # Convert 0/1 to text.
+  ) 
+
+write.csv(rsp_summary, file.path(table_dir, "RSP_summary_by_individual.csv"), row.names = FALSE ) 
+
+p_rsp_density <- ggplot(df_rsp, aes(x = RSP_scaled, colour = niche_type)) + 
+  geom_density(linewidth = 1) + # Plot density curves.
+  theme_minimal(base_size = 12) + # Use clean theme.
+  labs( # Add labels.
+    title = "Density of scaled relative selection strength", # Plot title.
+    x = "RSP_scaled", # X-axis label.
+    y = "Density", # Y-axis label.
+    colour = "Niche component" # Legend title.
+  ) 
+
+print(p_rsp_density) # Show plot in RStudio.
+
+ggsave(file.path(plot_dir, "03_RSP_scaled_density.png"), p_rsp_density, 
+       width = 8, # Plot width.
+       height = 5, # Plot height.
+       dpi = 300 # Plot resolution
+) 
