@@ -1,5 +1,5 @@
 # Welcome! 
-This folder contains the data, code, results and figures associated with: 
+This folder contains the data, code, results and figures associated with the publication: 
 
 Takola, E. (2026). The individualised niche in motion: Quantifying individual specialisation with movement data. Individual-based Ecology, 2, e203247.
 https://doi.org/10.3897/ibe.2.203247
