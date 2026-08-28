@@ -1,7 +1,8 @@
 # Welcome! 
 This is a repository dedicated to the study of individualised niches. 
 
-The individualised niche is the range of environmental conditions that provides an expected lifetime reproductive success of ≥ 1 surviving offspring to particular individuals.
+> The individualised niche is the range of environmental conditions that provides an expected lifetime reproductive success of ≥ 1 surviving offspring to particular individuals.
+
 This concept was formally introduced by Takola & Schielzeth (2026) in their paper: 
 
 Takola, E. & Schielzeth, H. (2022). Hutchinson’s ecological niche for individuals. Biology & Philosophy, 37, 25. https://doi.org/10.1007/s10539-022-09849-y
