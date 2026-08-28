@@ -10,8 +10,8 @@ The study develops a practical approach for quantifying individualised niches fr
 ## Repository structure
 There are three folders in this repository: _Data_, _Results_ and _Script_. 
 * The  `Data` folder contains the data used in the analyses. The file data_with_RSPs.csv already includes the scaled relative selection probabilities (RSPs), allowing the subsequent niche analyses to be reproduced without rerunning the preceding habitat-selection models.
-* The Results folder contains the numerical outputs of the analyses. Its subfolder Figures contains the graphical outputs and figures associated with the study.
-* The Script folder contains the R code required to reproduce the analyses, results, and figures, together with supporting documentation on the workflow and computational environment.
+* The `Results` folder contains the numerical outputs of the analyses. Its subfolder `Figures` contains the graphical outputs and figures associated with the study.
+* The `Script` folder contains the R code required to reproduce the analyses, results, and figures, together with supporting documentation on the workflow and computational environment.
 
 
 `Data/`
