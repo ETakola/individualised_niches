@@ -10,8 +10,8 @@ This is a conceptual figure of the main idea behind the study.
 
 <img width="547" height="185" alt="UpdatedFig" src="https://github.com/user-attachments/assets/d4bbccee-c482-4795-b84b-a2944e117f9b" />
 
-_
-Figure: Heuristic representation of the different niche levels. A) A community can be represented as a set of species where each one occupies a different niche. B) A species can be represented as a set of meta-populations with different niches. C) A population consists of multiple individuals with different individualised niches (potential niche is shown with transparent dots, realized niche is shown with bold dots). _
+
+*Figure: Heuristic representation of the different niche levels. A) A community can be represented as a set of species where each one occupies a different niche. B) A species can be represented as a set of meta-populations with different niches. C) A population consists of multiple individuals with different individualised niches (potential niche is shown with transparent dots, realized niche is shown with bold dots).*
 
 ## Repository structure
 There are three folders in this repository: _Data_, _Results_ and _Script_. 
