@@ -5,8 +5,6 @@ The individualised niche is the range of environmental conditions that provides 
 This concept was formally introduced by Takola & Schielzeth (2026) in their paper: 
 Takola, E. & Schielzeth, H. (2022). Hutchinson’s ecological niche for individuals. Biology & Philosophy, 37, 25. https://doi.org/10.1007/s10539-022-09849-y
 
-Find more info about the concept[here]([url](https://www.researchgate.net/publication/350530914_Hutchinson's_ecological_niche_for_individuals)). 
-
 The folder Takola2026_IBE is dedicated to the published paper: 
 Takola, E. (2026). The individualized niche in motion: Quantifying individual specialisation with movement data. Individual-based Ecology, 2, e203247. https://doi.org/10.3897/ibe.2.203247
 and it contains all relevant data and code. 
