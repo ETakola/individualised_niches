@@ -6,7 +6,7 @@ This is a repository dedicated to the study of individualised niches. The follow
 
 The folder [Takola2026_IBE](https://github.com/ETakola/individualised_niches/tree/main/Takola2026_IBE) is dedicated to a published paper[^2] which introduced a workflow to quantify individualised niches from movement data.
 
-# References
+## References
 [^1]:Takola, E. & Schielzeth, H. (2022). Hutchinson’s ecological niche for individuals. Biology & Philosophy, 37, 25. https://doi.org/10.1007/s10539-022-09849-y
 
 [^2]:Takola, E. (2026). The individualized niche in motion: Quantifying individual specialisation with movement data. Individual-based Ecology, 2, e203247. https://doi.org/10.3897/ibe.2.203247
