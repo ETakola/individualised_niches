@@ -1,7 +1,0 @@
-"group","rsp_column","rsp_column_present","variables_requested","variables_present","variables_missing","n_variables_present"
-"food","rsp_food",TRUE,"etf_abundance_r, etf_abundance, swi_T15","etf_abundance_r, etf_abundance, swi_T15","",3
-"humans","rsp_humans",TRUE,"pop_dens, crop_intens, thp","pop_dens, crop_intens, thp","",3
-"veg","rsp_veg",TRUE,"crop_type, NDVI","crop_type, NDVI","",2
-"chemicals","rsp_chemicals",FALSE,"p_glyphosate, p_mcpa, p_dicamba, p_pendimethalin, p_fluroxypy, p_tebuconazole, p_propiconazole, p_azoxystrobin, p_pyraclostrobin","p_glyphosate, p_mcpa, p_dicamba, p_pendimethalin, p_fluroxypy, p_tebuconazole, p_propiconazole, p_azoxystrobin, p_pyraclostrobin","",9
-"weather","rsp_weather",TRUE,"temp_2m, t_precipitation, uc_wind_10m, vc_wind_10m, wind_speed_10m","temp_2m, t_precipitation, uc_wind_10m, vc_wind_10m, wind_speed_10m","",5
-"soil","rsp_soil",TRUE,"org_carbon, org_carbon_st, bulk_dens, nitrog, swi_T5, swi_T2, swi_T10","org_carbon, org_carbon_st, bulk_dens, nitrog, swi_T5, swi_T2, swi_T10","",7
