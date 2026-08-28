@@ -6,12 +6,6 @@ https://doi.org/10.3897/ibe.2.203247
 
 The study develops a practical approach for quantifying individualised niches from animal movement data. It uses individual-specific habitat-selection relationships to describe environmental niche dimensions and then quantifies individual niche breadth and overlap in multidimensional environmental space.
 
-This is a conceptual figure of the main idea behind the study. 
-
-<img width="547" height="185" alt="UpdatedFig" src="https://github.com/user-attachments/assets/d4bbccee-c482-4795-b84b-a2944e117f9b" />
-
-
-*Figure: Heuristic representation of the different niche levels. A) A community can be represented as a set of species where each one occupies a different niche. B) A species can be represented as a set of meta-populations with different niches. C) A population consists of multiple individuals with different individualised niches (potential niche is shown with transparent dots, realized niche is shown with bold dots).*
 
 ## Repository structure
 There are three folders in this repository: _Data_, _Results_ and _Script_. 
@@ -28,6 +22,14 @@ Similarly to the Hutchinsonian ecological niche, they distinguished between the 
 * The potential individualized niche is the volume in environmental space in which a particular individual could be found with an expected lifetime reproductive success of ≥ 1. The potential individualized niche cannot directly be quantified, but significant parts of the niche space can usually be statistically inferred.
 
 They also defined a fundamental individualised niche, but this is not relevant to this study (a definition is provided [here](https://www.researchgate.net/publication/361497997_Hutchinson's_ecological_niche_for_individuals)). 
+
+
+This is a conceptual figure of the main idea behind the study. 
+
+<img width="547" height="185" alt="UpdatedFig" src="https://github.com/user-attachments/assets/d4bbccee-c482-4795-b84b-a2944e117f9b" />
+
+
+*Figure: Heuristic representation of the different niche levels. A) A community can be represented as a set of species where each one occupies a different niche. B) A species can be represented as a set of meta-populations with different niches. C) A population consists of multiple individuals with different individualised niches (potential niche is shown with transparent dots, realized niche is shown with bold dots).*
 
 ## Open science statement
 I commit to conducting this project according to open science principles to maximize transparency, reproducibility, and reuse. Where feasible, I will preregister key research questions and the analysis plan, and I will clearly document and justify any deviations. I will share analysis code, workflows, and documentation using version control (GitHub) and archive a release in a trusted repository (OSF) with a DOI. Data and metadata (including a data dictionary and provenance notes) will be deposited in an appropriate repository under an open license whenever possible. If data cannot be fully shared due to privacy, sensitive locations, legal constraints, or community/Indigenous data sovereignty, I will provide a transparent explanation, share de-identified or aggregated data when appropriate, and/or enable controlled access. I will support computational reproducibility by providing scripts to regenerate all results and figures and, where feasible, a reproducible computing environment. I will disseminate findings through preprints and open-access publication when possible and will make project outputs findable and reusable by following [FAIR principles](https://www.nature.com/articles/sdata201618) and the [TADA guidelines](https://ecoevorxiv.org/repository/view/9806/).
