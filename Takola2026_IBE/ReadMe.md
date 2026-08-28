@@ -1,5 +1,10 @@
 # Welcome! 
-This is a folder to support a manuscript on the quantification of individualised niches, as they were defined in Takola & Schielzeth (2022). 
+This folder contains the data, code, results and figures associated with: 
+
+Takola, E. (2026). The individualised niche in motion: Quantifying individual specialisation with movement data. Individual-based Ecology, 2, e203247.
+https://doi.org/10.3897/ibe.2.203247
+
+The study develops a practical approach for quantifying individualised niches from animal movement data. It uses individual-specific habitat-selection relationships to describe environmental niche dimensions and then quantifies individual niche breadth and overlap in multidimensional environmental space.
 
 This is a conceptual figure of the main idea behind the study. 
 
