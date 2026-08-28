@@ -4,6 +4,8 @@ This is a repository dedicated to the study of individualised niches. The follow
 > [!IMPORTANT]
 > The individualised niche is the range of environmental conditions that provides an expected lifetime reproductive success of ≥ 1 surviving offspring to particular individuals (Takola & Schielzeth 2022).
 
+
+# Repository components
 The folder [Takola2026_IBE](https://github.com/ETakola/individualised_niches/tree/main/Takola2026_IBE) is dedicated to a published paper[^2] which introduced a workflow to quantify individualised niches from movement data. The folder contains all the results of the study as well as the data and code needed to reproduce them.
 
 ### References
