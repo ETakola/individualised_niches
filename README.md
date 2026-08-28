@@ -1,10 +1,8 @@
 # Welcome! 
-This is a repository dedicated to the study of individualised niches. 
+This is a repository dedicated to the study of individualised niches. The following definition was formally introduced by Takola & Schielzeth (2022)[^1].
 
 > [!IMPORTANT]
 > The individualised niche is the range of environmental conditions that provides an expected lifetime reproductive success of ≥ 1 surviving offspring to particular individuals (Takola & Schielzeth 2022).
-
-This definition was formally introduced by Takola & Schielzeth (2022)[^1].
 
 The folder [Takola2026_IBE](https://github.com/ETakola/individualised_niches/tree/main/Takola2026_IBE) is dedicated to a published paper[^2] which introduced a workflow to quantify individualised niches from movement data.
 
