@@ -7,7 +7,7 @@ This definition was formally introduced by Takola & Schielzeth (2022) in their p
 
 Takola, E. & Schielzeth, H. (2022). Hutchinson’s ecological niche for individuals. Biology & Philosophy, 37, 25. https://doi.org/10.1007/s10539-022-09849-y
 
-The folder [Takola2026_IBE]((https://github.com/ETakola/individualised_niches/tree/main/Takola2026_IBE)) is dedicated to the published paper: 
+The folder [Takola2026_IBE](((https://github.com/ETakola/individualised_niches/tree/main/Takola2026_IBE)) is dedicated to the published paper: 
 
 Takola, E. (2026). The individualized niche in motion: Quantifying individual specialisation with movement data. Individual-based Ecology, 2, e203247. https://doi.org/10.3897/ibe.2.203247
 and it contains all relevant data and code. 
